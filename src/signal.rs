@@ -5,7 +5,6 @@
 ///
 /// On Windows, signal handling for SIGUSR1 is not available; this module
 /// provides a no-op implementation.
-
 use tracing::info;
 
 /// Start the platform-specific signal handler.

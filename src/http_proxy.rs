@@ -32,8 +32,8 @@ impl HttpConnector {
         if let Some((ref user, ref pass)) = self.user {
             use base64::Engine;
             let p = pass.as_deref().unwrap_or("");
-            let encoded = base64::engine::general_purpose::STANDARD
-                .encode(format!("{}:{}", user, p));
+            let encoded =
+                base64::engine::general_purpose::STANDARD.encode(format!("{}:{}", user, p));
             req.push_str(&format!("Proxy-Authorization: Basic {}\r\n", encoded));
         }
         req.push_str("\r\n");
@@ -83,11 +83,7 @@ impl HttpHandler {
         }
     }
 
-    async fn authenticate(
-        &self,
-        user: &str,
-        password: &str,
-    ) -> bool {
+    async fn authenticate(&self, user: &str, password: &str) -> bool {
         if let Some(ref auth) = self.options.authenticator {
             auth.authenticate(user, password)
         } else {
@@ -219,12 +215,7 @@ impl Handler for HttpHandler {
         }
 
         // Connect to target through chain
-        let chain = self
-            .options
-            .chain
-            .as_ref()
-            .cloned()
-            .unwrap_or_default();
+        let chain = self.options.chain.as_ref().cloned().unwrap_or_default();
 
         let retries = if self.options.retries > 0 {
             self.options.retries
@@ -380,7 +371,10 @@ mod tests {
     async fn test_http_handler_bypass() {
         use std::sync::Arc;
 
-        let bypass = Arc::new(crate::bypass::Bypass::from_patterns(false, &["blocked.com"]));
+        let bypass = Arc::new(crate::bypass::Bypass::from_patterns(
+            false,
+            &["blocked.com"],
+        ));
         let handler = HttpHandler::new(HandlerOptions {
             bypass: Some(bypass),
             ..Default::default()

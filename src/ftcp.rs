@@ -39,10 +39,7 @@ impl FakeTcpTransporter {
     /// 1. Create a raw TCP socket
     /// 2. Perform a fake 3-way handshake
     /// 3. Send UDP payloads wrapped in TCP frames
-    pub async fn dial(
-        &self,
-        addr: &str,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    pub async fn dial(&self, addr: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         info!("[ftcp] dialing {}", addr);
         Err("FakeTCP requires raw socket support (platform-specific)".into())
     }
@@ -64,9 +61,7 @@ impl FakeTcpListener {
     }
 
     /// Listen for FakeTCP connections.
-    pub async fn listen(
-        &self,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    pub async fn listen(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         info!("[ftcp] listening on {}", self.addr);
         Err("FakeTCP requires raw socket support (platform-specific)".into())
     }
@@ -93,8 +88,7 @@ mod tests {
 
     #[test]
     fn test_ftcp_listener_creation() {
-        let listener =
-            FakeTcpListener::new("0.0.0.0:8080", FakeTcpListenConfig::default());
+        let listener = FakeTcpListener::new("0.0.0.0:8080", FakeTcpListenConfig::default());
         assert_eq!(listener.addr, "0.0.0.0:8080");
     }
 

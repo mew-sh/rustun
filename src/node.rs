@@ -89,7 +89,10 @@ impl Node {
             None
         };
 
-        let values: HashMap<String, String> = u.query_pairs().map(|(k, v)| (k.into_owned(), v.into_owned())).collect();
+        let values: HashMap<String, String> = u
+            .query_pairs()
+            .map(|(k, v)| (k.into_owned(), v.into_owned()))
+            .collect();
 
         let scheme = u.scheme();
         let schemes: Vec<&str> = scheme.split('+').collect();
@@ -172,9 +175,9 @@ impl fmt::Display for Node {
 fn normalize_transport(t: &str) -> String {
     match t {
         "https" => "tls".to_string(),
-        "tls" | "mtls" | "http2" | "h2" | "h2c" | "ws" | "mws" | "wss" | "mwss" | "kcp"
-        | "ssh" | "quic" | "ohttp" | "otls" | "obfs4" | "tcp" | "udp" | "rtcp" | "rudp"
-        | "tun" | "tap" | "ftcp" | "dns" | "redu" | "redirectu" | "vsock" | "ssu" => {
+        "tls" | "mtls" | "http2" | "h2" | "h2c" | "ws" | "mws" | "wss" | "mwss" | "kcp" | "ssh"
+        | "quic" | "ohttp" | "otls" | "obfs4" | "tcp" | "udp" | "rtcp" | "rudp" | "tun" | "tap"
+        | "ftcp" | "dns" | "redu" | "redirectu" | "vsock" | "ssu" => {
             if t == "ssu" {
                 "udp".to_string()
             } else {
@@ -190,11 +193,9 @@ fn normalize_protocol(p: &str) -> String {
         "https" => "http".to_string(),
         "socks" | "socks5" => "socks5".to_string(),
         "ss2" => "ss".to_string(),
-        "http" | "http2" | "socks4" | "socks4a" | "ss" | "ssu" | "sni" | "tcp" | "udp"
-        | "rtcp" | "rudp" | "direct" | "remote" | "forward" | "red" | "redirect" | "redu"
-        | "redirectu" | "tun" | "tap" | "ftcp" | "dns" | "dot" | "doh" | "relay" => {
-            p.to_string()
-        }
+        "http" | "http2" | "socks4" | "socks4a" | "ss" | "ssu" | "sni" | "tcp" | "udp" | "rtcp"
+        | "rudp" | "direct" | "remote" | "forward" | "red" | "redirect" | "redu" | "redirectu"
+        | "tun" | "tap" | "ftcp" | "dns" | "dot" | "doh" | "relay" => p.to_string(),
         "auto" => String::new(),
         _ => String::new(),
     }
@@ -214,10 +215,7 @@ fn parse_duration(s: &str) -> Option<Duration> {
         return s.parse::<u64>().ok().map(|m| Duration::from_secs(m * 60));
     }
     if let Some(s) = s.strip_suffix('h') {
-        return s
-            .parse::<u64>()
-            .ok()
-            .map(|h| Duration::from_secs(h * 3600));
+        return s.parse::<u64>().ok().map(|h| Duration::from_secs(h * 3600));
     }
     None
 }

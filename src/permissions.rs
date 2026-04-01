@@ -51,7 +51,8 @@ impl PortSet {
         if s.is_empty() {
             return Err(PermissionError::EmptyPort);
         }
-        let ranges: Result<Vec<PortRange>, _> = s.split(',').map(|r| PortRange::parse(r.trim())).collect();
+        let ranges: Result<Vec<PortRange>, _> =
+            s.split(',').map(|r| PortRange::parse(r.trim())).collect();
         Ok(PortSet(ranges?))
     }
 

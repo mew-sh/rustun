@@ -122,11 +122,7 @@ impl Socks5Handler {
         Self { options }
     }
 
-    async fn authenticate(
-        &self,
-        user: &str,
-        password: &str,
-    ) -> bool {
+    async fn authenticate(&self, user: &str, password: &str) -> bool {
         if let Some(ref auth) = self.options.authenticator {
             auth.authenticate(user, password)
         } else {
@@ -186,10 +182,7 @@ impl Handler for Socks5Handler {
                     debug!("[socks5] {} authenticated as {}", peer_addr, user);
                 } else {
                     conn.write_all(&[0x01, 0x01]).await?;
-                    warn!(
-                        "[socks5] {} authentication failed for {}",
-                        peer_addr, user
-                    );
+                    warn!("[socks5] {} authentication failed for {}", peer_addr, user);
                     return Err(HandlerError::AuthFailed);
                 }
             } else {
@@ -236,12 +229,7 @@ impl Handler for Socks5Handler {
                 }
 
                 // Connect through chain
-                let chain = self
-                    .options
-                    .chain
-                    .as_ref()
-                    .cloned()
-                    .unwrap_or_default();
+                let chain = self.options.chain.as_ref().cloned().unwrap_or_default();
 
                 match chain.dial(&target).await {
                     Ok(cc) => {
@@ -319,9 +307,9 @@ async fn send_reply(
 }
 
 fn parse_address(addr: &str) -> Result<(String, u16), HandlerError> {
-    let (host, port_str) = addr.rsplit_once(':').ok_or_else(|| {
-        HandlerError::Proxy(format!("invalid address: {}", addr))
-    })?;
+    let (host, port_str) = addr
+        .rsplit_once(':')
+        .ok_or_else(|| HandlerError::Proxy(format!("invalid address: {}", addr)))?;
     let port: u16 = port_str
         .parse()
         .map_err(|_| HandlerError::Proxy(format!("invalid port: {}", port_str)))?;
@@ -343,10 +331,7 @@ fn encode_address(host: &str, port: u16, buf: &mut Vec<u8>) {
     buf.extend_from_slice(&port.to_be_bytes());
 }
 
-async fn read_address(
-    conn: &mut TcpStream,
-    atyp: u8,
-) -> Result<(String, u16), HandlerError> {
+async fn read_address(conn: &mut TcpStream, atyp: u8) -> Result<(String, u16), HandlerError> {
     let host = match atyp {
         ATYP_IPV4 => {
             let mut addr = [0u8; 4];
@@ -481,17 +466,16 @@ mod tests {
         let mut client = TcpStream::connect(proxy_addr).await.unwrap();
 
         // Greeting with user/pass method
-        client
-            .write_all(&[0x05, 0x02, 0x00, 0x02])
-            .await
-            .unwrap();
+        client.write_all(&[0x05, 0x02, 0x00, 0x02]).await.unwrap();
         let mut resp = [0u8; 2];
         client.read_exact(&mut resp).await.unwrap();
         assert_eq!(resp[0], 0x05);
         assert_eq!(resp[1], 0x02); // user/pass required
 
         // Send auth - wrong password
-        let auth_req = [0x01, 4, b'u', b's', b'e', b'r', 5, b'w', b'r', b'o', b'n', b'g'];
+        let auth_req = [
+            0x01, 4, b'u', b's', b'e', b'r', 5, b'w', b'r', b'o', b'n', b'g',
+        ];
         client.write_all(&auth_req).await.unwrap();
         let mut auth_resp = [0u8; 2];
         client.read_exact(&mut auth_resp).await.unwrap();
@@ -630,7 +614,10 @@ mod tests {
     async fn test_socks5_handler_with_bypass() {
         use std::sync::Arc;
 
-        let bypass = Arc::new(crate::bypass::Bypass::from_patterns(false, &["blocked.com"]));
+        let bypass = Arc::new(crate::bypass::Bypass::from_patterns(
+            false,
+            &["blocked.com"],
+        ));
         let handler = Socks5Handler::new(HandlerOptions {
             bypass: Some(bypass),
             ..Default::default()

@@ -143,8 +143,8 @@ impl Handler for UdpRedirectHandler {
 /// rule.  Returns `None` if the syscall fails or is not available.
 #[cfg(target_os = "linux")]
 fn get_original_dst_linux(conn: &TcpStream) -> Option<String> {
-    use std::os::unix::io::AsRawFd;
     use std::net::{Ipv4Addr, SocketAddrV4};
+    use std::os::unix::io::AsRawFd;
 
     // SOL_IP = 0, SO_ORIGINAL_DST = 80
     const SOL_IP: libc::c_int = 0;
@@ -153,8 +153,7 @@ fn get_original_dst_linux(conn: &TcpStream) -> Option<String> {
     let fd = conn.as_raw_fd();
 
     let mut addr: libc::sockaddr_in = unsafe { std::mem::zeroed() };
-    let mut addr_len: libc::socklen_t =
-        std::mem::size_of::<libc::sockaddr_in>() as libc::socklen_t;
+    let mut addr_len: libc::socklen_t = std::mem::size_of::<libc::sockaddr_in>() as libc::socklen_t;
 
     let ret = unsafe {
         libc::getsockopt(

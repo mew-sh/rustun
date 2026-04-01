@@ -10,9 +10,9 @@ pub struct VsockAddr {
 impl VsockAddr {
     /// Parse a VSOCK address string in format "context_id:port".
     pub fn parse(addr: &str) -> Result<Self, VsockError> {
-        let (host_str, port_str) = addr.rsplit_once(':').ok_or_else(|| {
-            VsockError::InvalidAddress(format!("missing port in '{}'", addr))
-        })?;
+        let (host_str, port_str) = addr
+            .rsplit_once(':')
+            .ok_or_else(|| VsockError::InvalidAddress(format!("missing port in '{}'", addr)))?;
 
         let context_id = if host_str.is_empty() {
             0
@@ -49,10 +49,7 @@ impl VsockTransporter {
     }
 
     /// Dial a VSOCK connection.
-    pub async fn dial(
-        &self,
-        addr: &str,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    pub async fn dial(&self, addr: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let _vaddr = VsockAddr::parse(addr)?;
         #[cfg(target_os = "linux")]
         {
@@ -79,18 +76,14 @@ impl VsockListener {
 
     /// Start listening on the VSOCK address.
     #[cfg(target_os = "linux")]
-    pub async fn listen(
-        &self,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    pub async fn listen(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         info!("[vsock] listening on {}", self.addr);
         // In a full implementation: vsock::VsockListener::bind(cid, port)
         Err("VSOCK support requires the vsock crate".into())
     }
 
     #[cfg(not(target_os = "linux"))]
-    pub async fn listen(
-        &self,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    pub async fn listen(&self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         Err("VSOCK is only supported on Linux".into())
     }
 }

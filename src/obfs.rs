@@ -51,9 +51,7 @@ impl ObfsHttpTransporter {
                 return Err(HandlerError::Proxy("obfs-http: connection closed".into()));
             }
             response.push(b[0]);
-            if response.len() >= 4
-                && response[response.len() - 4..] == *b"\r\n\r\n"
-            {
+            if response.len() >= 4 && response[response.len() - 4..] == *b"\r\n\r\n" {
                 break;
             }
         }
@@ -79,10 +77,7 @@ impl ObfsHttpListener {
     }
 
     /// Accept HTTP obfuscation handshake (server side).
-    pub async fn accept_handshake(
-        &self,
-        mut conn: TcpStream,
-    ) -> Result<TcpStream, HandlerError> {
+    pub async fn accept_handshake(&self, mut conn: TcpStream) -> Result<TcpStream, HandlerError> {
         // Read HTTP request until \r\n\r\n
         let mut buf = vec![0u8; 4096];
         let mut total = 0;
@@ -157,10 +152,7 @@ impl ObfsTlsListener {
     }
 
     /// Accept TLS obfuscation handshake (server side).
-    pub async fn accept_handshake(
-        &self,
-        mut conn: TcpStream,
-    ) -> Result<TcpStream, HandlerError> {
+    pub async fn accept_handshake(&self, mut conn: TcpStream) -> Result<TcpStream, HandlerError> {
         // Read fake ClientHello
         let mut header = [0u8; 5];
         conn.read_exact(&mut header).await?;

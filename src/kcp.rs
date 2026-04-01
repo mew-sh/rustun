@@ -48,15 +48,33 @@ pub struct KcpConfig {
     pub tcp: bool,
 }
 
-fn default_mtu() -> u32 { 1350 }
-fn default_sndwnd() -> u32 { 1024 }
-fn default_rcvwnd() -> u32 { 1024 }
-fn default_datashard() -> u32 { 10 }
-fn default_parityshard() -> u32 { 3 }
-fn default_interval() -> u32 { 50 }
-fn default_sockbuf() -> u32 { 4194304 }
-fn default_smuxver() -> u32 { 1 }
-fn default_keepalive() -> u32 { 10 }
+fn default_mtu() -> u32 {
+    1350
+}
+fn default_sndwnd() -> u32 {
+    1024
+}
+fn default_rcvwnd() -> u32 {
+    1024
+}
+fn default_datashard() -> u32 {
+    10
+}
+fn default_parityshard() -> u32 {
+    3
+}
+fn default_interval() -> u32 {
+    50
+}
+fn default_sockbuf() -> u32 {
+    4194304
+}
+fn default_smuxver() -> u32 {
+    1
+}
+fn default_keepalive() -> u32 {
+    10
+}
 
 impl Default for KcpConfig {
     fn default() -> Self {

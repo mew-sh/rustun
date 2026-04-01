@@ -129,9 +129,7 @@ async fn start_from_cli(cli: &Cli) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-async fn start_from_config(
-    cfg: config::Config,
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn start_from_config(cfg: config::Config) -> Result<(), Box<dyn std::error::Error>> {
     for route in cfg.routes {
         let chain = if route.chain_nodes.is_empty() {
             Chain::empty()
@@ -222,16 +220,10 @@ fn build_handler_options(node: &Node, chain: Chain) -> HandlerOptions {
     let retries = node.get_int("retry") as usize;
 
     // --- Proxy Agent ---
-    let proxy_agent = node
-        .get("proxyAgent")
-        .unwrap_or("")
-        .to_string();
+    let proxy_agent = node.get("proxyAgent").unwrap_or("").to_string();
 
     // --- Host (for SNI proxy) ---
-    let host = node
-        .get("host")
-        .unwrap_or("")
-        .to_string();
+    let host = node.get("host").unwrap_or("").to_string();
 
     HandlerOptions {
         addr: node.addr.clone(),
@@ -279,7 +271,11 @@ async fn run_server(
 
     info!(
         "{}://{} on {}",
-        if protocol.is_empty() { "auto" } else { &protocol },
+        if protocol.is_empty() {
+            "auto"
+        } else {
+            &protocol
+        },
         addr,
         addr
     );

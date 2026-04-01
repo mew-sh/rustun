@@ -169,9 +169,7 @@ pub fn parse_ssh_key_file(path: &str) -> Result<Vec<u8>, std::io::Error> {
 }
 
 /// Parse SSH authorized keys file.
-pub fn parse_ssh_authorized_keys_file(
-    path: &str,
-) -> Result<Vec<String>, std::io::Error> {
+pub fn parse_ssh_authorized_keys_file(path: &str) -> Result<Vec<String>, std::io::Error> {
     let content = std::fs::read_to_string(path)?;
     Ok(content
         .lines()
@@ -217,10 +215,7 @@ mod tests {
 
     #[test]
     fn test_ssh_forward_handler_creation() {
-        let handler = SshForwardHandler::new(
-            HandlerOptions::default(),
-            SshConfig::default(),
-        );
+        let handler = SshForwardHandler::new(HandlerOptions::default(), SshConfig::default());
         assert!(handler.config.key_file.is_none());
     }
 }

@@ -18,10 +18,7 @@ pub struct Chain {
 
 impl Chain {
     pub fn new(nodes: Vec<Node>) -> Self {
-        let node_groups = nodes
-            .into_iter()
-            .map(|n| NodeGroup::new(vec![n]))
-            .collect();
+        let node_groups = nodes.into_iter().map(|n| NodeGroup::new(vec![n])).collect();
         Chain {
             retries: 0,
             mark: 0,
@@ -191,7 +188,12 @@ impl Chain {
         Ok(current)
     }
 
-    fn resolve(&self, addr: &str, resolver: Option<&crate::resolver::Resolver>, hosts: Option<&Hosts>) -> String {
+    fn resolve(
+        &self,
+        addr: &str,
+        resolver: Option<&crate::resolver::Resolver>,
+        hosts: Option<&Hosts>,
+    ) -> String {
         if let Some((host, port)) = addr.rsplit_once(':') {
             // Check hosts table first
             if let Some(hosts) = hosts {
@@ -220,13 +222,11 @@ impl Default for Chain {
 }
 
 /// HTTP CONNECT tunnel through a proxy.
-async fn http_connect(
-    mut stream: TcpStream,
-    target: &str,
-) -> Result<TcpStream, ChainError> {
+async fn http_connect(mut stream: TcpStream, target: &str) -> Result<TcpStream, ChainError> {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-    let req = format!(
+    let req =
+        format!(
         "CONNECT {} HTTP/1.1\r\nHost: {}\r\nUser-Agent: {}\r\nProxy-Connection: keep-alive\r\n\r\n",
         target, target, crate::DEFAULT_USER_AGENT
     );
@@ -252,10 +252,7 @@ async fn http_connect(
 }
 
 /// SOCKS5 CONNECT through a proxy.
-async fn socks5_connect(
-    mut stream: TcpStream,
-    target: &str,
-) -> Result<TcpStream, ChainError> {
+async fn socks5_connect(mut stream: TcpStream, target: &str) -> Result<TcpStream, ChainError> {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
     // SOCKS5 handshake: send greeting
@@ -265,18 +262,15 @@ async fn socks5_connect(
         .map_err(ChainError::Io)?;
 
     let mut buf = [0u8; 2];
-    stream
-        .read_exact(&mut buf)
-        .await
-        .map_err(ChainError::Io)?;
+    stream.read_exact(&mut buf).await.map_err(ChainError::Io)?;
     if buf[0] != 0x05 || buf[1] != 0x00 {
         return Err(ChainError::ProxyError("SOCKS5 handshake failed".into()));
     }
 
     // Parse target
-    let (host, port) = target.rsplit_once(':').ok_or_else(|| {
-        ChainError::ProxyError("invalid target address".into())
-    })?;
+    let (host, port) = target
+        .rsplit_once(':')
+        .ok_or_else(|| ChainError::ProxyError("invalid target address".into()))?;
     let port: u16 = port
         .parse()
         .map_err(|_| ChainError::ProxyError("invalid port".into()))?;
@@ -296,17 +290,11 @@ async fn socks5_connect(
     }
     req.extend_from_slice(&port.to_be_bytes());
 
-    stream
-        .write_all(&req)
-        .await
-        .map_err(ChainError::Io)?;
+    stream.write_all(&req).await.map_err(ChainError::Io)?;
 
     // Read response
     let mut resp = [0u8; 4];
-    stream
-        .read_exact(&mut resp)
-        .await
-        .map_err(ChainError::Io)?;
+    stream.read_exact(&mut resp).await.map_err(ChainError::Io)?;
 
     if resp[1] != 0x00 {
         return Err(ChainError::ProxyError(format!(
@@ -454,7 +442,8 @@ mod tests {
         let proxy_addr = proxy_listener.local_addr().unwrap();
 
         tokio::spawn(async move {
-            let handler = crate::http_proxy::HttpHandler::new(crate::handler::HandlerOptions::default());
+            let handler =
+                crate::http_proxy::HttpHandler::new(crate::handler::HandlerOptions::default());
             let (conn, _) = proxy_listener.accept().await.unwrap();
             handler.handle(conn).await.ok();
         });
@@ -487,7 +476,8 @@ mod tests {
         let proxy_addr = proxy_listener.local_addr().unwrap();
 
         tokio::spawn(async move {
-            let handler = crate::socks5::Socks5Handler::new(crate::handler::HandlerOptions::default());
+            let handler =
+                crate::socks5::Socks5Handler::new(crate::handler::HandlerOptions::default());
             let (conn, _) = proxy_listener.accept().await.unwrap();
             handler.handle(conn).await.ok();
         });

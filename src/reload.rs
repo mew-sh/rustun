@@ -19,10 +19,7 @@ pub trait Stoppable {
 
 /// Periodically reload a config file.
 /// Returns when the reloader period is 0 (disabled) or negative (stopped).
-pub async fn period_reload(
-    reloader: &dyn Reloader,
-    config_file: &str,
-) -> io::Result<()> {
+pub async fn period_reload(reloader: &dyn Reloader, config_file: &str) -> io::Result<()> {
     if config_file.is_empty() {
         return Ok(());
     }
@@ -38,9 +35,7 @@ pub async fn period_reload(
 
         let path = Path::new(config_file);
         let metadata = fs::metadata(path)?;
-        let mod_time = metadata
-            .modified()
-            .unwrap_or(SystemTime::UNIX_EPOCH);
+        let mod_time = metadata.modified().unwrap_or(SystemTime::UNIX_EPOCH);
 
         if last_mod != SystemTime::UNIX_EPOCH && mod_time != last_mod {
             info!("[reload] {}", config_file);

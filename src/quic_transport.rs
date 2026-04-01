@@ -62,14 +62,9 @@ impl QuicTransporter {
         let mut endpoint = quinn::Endpoint::client("0.0.0.0:0".parse()?)?;
         endpoint.set_default_client_config(client_config);
 
-        let host = addr
-            .rsplit_once(':')
-            .map(|(h, _)| h)
-            .unwrap_or("localhost");
+        let host = addr.rsplit_once(':').map(|(h, _)| h).unwrap_or("localhost");
 
-        let connection = endpoint
-            .connect(remote, host)?
-            .await?;
+        let connection = endpoint.connect(remote, host)?.await?;
 
         info!("[quic] connected to {}", addr);
         Ok(connection)
@@ -103,10 +98,7 @@ impl QuicListener {
 
         let server_crypto = rustls::ServerConfig::builder()
             .with_no_client_auth()
-            .with_single_cert(
-                vec![cert_der],
-                priv_key.into(),
-            )?;
+            .with_single_cert(vec![cert_der], priv_key.into())?;
 
         let server_config = quinn::ServerConfig::with_crypto(Arc::new(
             quinn::crypto::rustls::QuicServerConfig::try_from(server_crypto)?,

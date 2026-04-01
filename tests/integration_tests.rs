@@ -174,7 +174,9 @@ async fn integration_socks5_auth_success_and_failure() {
                     authenticator: Some(auth.clone()),
                     ..Default::default()
                 });
-                tokio::spawn(async move { let _ = h.handle(conn).await; });
+                tokio::spawn(async move {
+                    let _ = h.handle(conn).await;
+                });
             }
         }
     });
@@ -183,7 +185,10 @@ async fn integration_socks5_auth_success_and_failure() {
     let connector = rustun::Socks5Connector::new(Some(("alice".into(), Some("secret".into()))));
     let stream = TcpStream::connect(proxy_addr).await.unwrap();
     let result = connector.connect(stream, &target_addr.to_string()).await;
-    assert!(result.is_ok(), "Auth with correct credentials should succeed");
+    assert!(
+        result.is_ok(),
+        "Auth with correct credentials should succeed"
+    );
 
     // --- Test 2: wrong credentials ---
     let connector_bad = rustun::Socks5Connector::new(Some(("alice".into(), Some("wrong".into()))));
@@ -313,10 +318,8 @@ async fn integration_tcp_remote_forward_echo() {
 async fn integration_relay_with_target() {
     let (target_addr, _target) = start_message_server(b"relay-target-ok").await;
 
-    let handler = rustun::RelayHandler::new(
-        &target_addr.to_string(),
-        rustun::HandlerOptions::default(),
-    );
+    let handler =
+        rustun::RelayHandler::new(&target_addr.to_string(), rustun::HandlerOptions::default());
     let proxy_listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let proxy_addr = proxy_listener.local_addr().unwrap();
 
@@ -343,11 +346,8 @@ async fn integration_relay_with_target() {
 async fn integration_shadowsocks_plain_cipher() {
     let (target_addr, _target) = start_message_server(b"ss-plain-ok").await;
 
-    let handler = rustun::ShadowHandler::new(
-        "plain",
-        "testpass",
-        rustun::HandlerOptions::default(),
-    );
+    let handler =
+        rustun::ShadowHandler::new("plain", "testpass", rustun::HandlerOptions::default());
     let proxy_listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let proxy_addr = proxy_listener.local_addr().unwrap();
 
@@ -389,8 +389,7 @@ async fn integration_chain_through_http_proxy() {
     });
 
     // Dial through chain
-    let node =
-        rustun::Node::parse(&format!("http://{}", proxy_addr)).unwrap();
+    let node = rustun::Node::parse(&format!("http://{}", proxy_addr)).unwrap();
     let chain = rustun::Chain::new(vec![node]);
 
     let mut conn = chain.dial(&target_addr.to_string()).await.unwrap();
@@ -413,8 +412,7 @@ async fn integration_chain_through_socks5_proxy() {
         }
     });
 
-    let node =
-        rustun::Node::parse(&format!("socks5://{}", proxy_addr)).unwrap();
+    let node = rustun::Node::parse(&format!("socks5://{}", proxy_addr)).unwrap();
     let chain = rustun::Chain::new(vec![node]);
 
     let mut conn = chain.dial(&target_addr.to_string()).await.unwrap();
@@ -429,7 +427,6 @@ async fn integration_chain_through_socks5_proxy() {
 
 #[tokio::test]
 async fn integration_auto_handler_detects_http() {
-
     let (target_addr, _target) = start_message_server(b"auto-http-ok").await;
 
     let handler = rustun::handler::AutoHandler::new(rustun::HandlerOptions::default());
@@ -456,7 +453,6 @@ async fn integration_auto_handler_detects_http() {
 
 #[tokio::test]
 async fn integration_auto_handler_detects_socks5() {
-
     let handler = rustun::handler::AutoHandler::new(rustun::HandlerOptions::default());
     let proxy_listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let proxy_addr = proxy_listener.local_addr().unwrap();
@@ -634,7 +630,6 @@ fn integration_node_parse_complex_url() {
 
 #[tokio::test]
 async fn integration_server_handles_concurrent_connections() {
-
     struct CounterHandler;
 
     #[async_trait::async_trait]

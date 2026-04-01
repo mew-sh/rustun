@@ -109,9 +109,7 @@ fn split_line(line: &str) -> Vec<String> {
         line
     };
     let line = line.replace('\t', " ");
-    line.split_whitespace()
-        .map(|s| s.to_string())
-        .collect()
+    line.split_whitespace().map(|s| s.to_string()).collect()
 }
 
 #[cfg(test)]
@@ -133,10 +131,7 @@ mod tests {
             hosts.lookup("localhost"),
             Some("127.0.0.1".parse().unwrap())
         );
-        assert_eq!(
-            hosts.lookup("router"),
-            Some("192.168.1.1".parse().unwrap())
-        );
+        assert_eq!(hosts.lookup("router"), Some("192.168.1.1".parse().unwrap()));
         assert_eq!(
             hosts.lookup("gateway"),
             Some("192.168.1.1".parse().unwrap())

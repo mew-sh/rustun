@@ -204,12 +204,7 @@ impl Handler for Socks4Handler {
                     }
                 }
 
-                let chain = self
-                    .options
-                    .chain
-                    .as_ref()
-                    .cloned()
-                    .unwrap_or_default();
+                let chain = self.options.chain.as_ref().cloned().unwrap_or_default();
 
                 match chain.dial(&target).await {
                     Ok(cc) => {
@@ -259,9 +254,9 @@ async fn send_reply(
 }
 
 fn parse_address(addr: &str) -> Result<(String, u16), HandlerError> {
-    let (host, port_str) = addr.rsplit_once(':').ok_or_else(|| {
-        HandlerError::Proxy(format!("invalid address: {}", addr))
-    })?;
+    let (host, port_str) = addr
+        .rsplit_once(':')
+        .ok_or_else(|| HandlerError::Proxy(format!("invalid address: {}", addr)))?;
     let port: u16 = port_str
         .parse()
         .map_err(|_| HandlerError::Proxy(format!("invalid port: {}", port_str)))?;

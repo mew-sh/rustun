@@ -193,10 +193,8 @@ impl Handler for RelayHandler {
                             user = String::from_utf8_lossy(&fdata[1..1 + ulen]).to_string();
                             let plen = fdata[1 + ulen] as usize;
                             if 2 + ulen + plen <= fdata.len() {
-                                pass = String::from_utf8_lossy(
-                                    &fdata[2 + ulen..2 + ulen + plen],
-                                )
-                                .to_string();
+                                pass = String::from_utf8_lossy(&fdata[2 + ulen..2 + ulen + plen])
+                                    .to_string();
                             }
                         }
                     }
@@ -218,9 +216,7 @@ impl Handler for RelayHandler {
                 info!(
                     "[relay] {} -> {} : {} unauthorized",
                     peer_addr,
-                    conn.local_addr()
-                        .map(|a| a.to_string())
-                        .unwrap_or_default(),
+                    conn.local_addr().map(|a| a.to_string()).unwrap_or_default(),
                     user
                 );
                 return Err(HandlerError::AuthFailed);
@@ -401,10 +397,13 @@ mod tests {
         kvs.insert("admin".into(), "secret".into());
         let auth = Arc::new(crate::auth::LocalAuthenticator::new(kvs));
 
-        let handler = RelayHandler::new("", HandlerOptions {
-            authenticator: Some(auth),
-            ..Default::default()
-        });
+        let handler = RelayHandler::new(
+            "",
+            HandlerOptions {
+                authenticator: Some(auth),
+                ..Default::default()
+            },
+        );
 
         let proxy = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let proxy_addr = proxy.local_addr().unwrap();

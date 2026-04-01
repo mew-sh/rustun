@@ -46,14 +46,14 @@ pub fn set_socket_mark(_fd: i32, _mark: i32) -> std::io::Result<()> {
 /// On non-Linux platforms, this is a no-op.
 #[cfg(target_os = "linux")]
 pub fn set_socket_interface(fd: std::os::unix::io::RawFd, iface: &str) -> std::io::Result<()> {
-    use std::io;
     use std::ffi::CString;
+    use std::io;
 
     const SOL_SOCKET: libc::c_int = 1;
     const SO_BINDTODEVICE: libc::c_int = 25;
 
-    let c_iface = CString::new(iface)
-        .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?;
+    let c_iface =
+        CString::new(iface).map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?;
     let ret = unsafe {
         libc::setsockopt(
             fd,

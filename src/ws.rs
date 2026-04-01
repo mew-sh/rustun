@@ -5,9 +5,7 @@ use futures_util::{SinkExt, StreamExt};
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio_tungstenite::{
-    connect_async,
-    tungstenite::protocol::Message,
-    MaybeTlsStream, WebSocketStream,
+    connect_async, tungstenite::protocol::Message, MaybeTlsStream, WebSocketStream,
 };
 use tracing::{debug, info};
 
@@ -219,10 +217,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_ws_handler_creation() {
-        let handler = WsHandler::new(
-            HandlerOptions::default(),
-            WsOptions::default(),
-        );
+        let handler = WsHandler::new(HandlerOptions::default(), WsOptions::default());
         // Just verify it constructs without error
         assert!(handler.options.chain.is_none());
     }

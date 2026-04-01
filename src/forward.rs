@@ -21,7 +21,13 @@ impl TcpDirectForwardHandler {
         // Parse comma-separated addresses
         let addrs: Vec<&str> = raddr
             .split(',')
-            .chain(options.node.as_ref().map(|n| n.values.get("ip").map(|s| s.as_str())).flatten())
+            .chain(
+                options
+                    .node
+                    .as_ref()
+                    .map(|n| n.values.get("ip").map(|s| s.as_str()))
+                    .flatten(),
+            )
             .filter(|a| !a.is_empty())
             .collect();
 
@@ -61,12 +67,7 @@ impl Handler for TcpDirectForwardHandler {
             1
         };
 
-        let chain = self
-            .options
-            .chain
-            .as_ref()
-            .cloned()
-            .unwrap_or_default();
+        let chain = self.options.chain.as_ref().cloned().unwrap_or_default();
 
         let mut cc = None;
         let mut node = Node::default();
@@ -241,10 +242,8 @@ mod tests {
         });
 
         // Start TCP forward proxy
-        let handler = TcpDirectForwardHandler::new(
-            &target_addr.to_string(),
-            HandlerOptions::default(),
-        );
+        let handler =
+            TcpDirectForwardHandler::new(&target_addr.to_string(), HandlerOptions::default());
         let proxy = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let proxy_addr = proxy.local_addr().unwrap();
 

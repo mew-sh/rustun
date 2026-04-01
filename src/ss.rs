@@ -28,9 +28,7 @@ impl SsCipher {
         match name.to_lowercase().as_str() {
             "aes-128-gcm" | "aead_aes_128_gcm" => Some(Self::Aes128Gcm),
             "aes-256-gcm" | "aead_aes_256_gcm" => Some(Self::Aes256Gcm),
-            "chacha20-ietf-poly1305" | "aead_chacha20_poly1305" => {
-                Some(Self::ChaCha20Poly1305)
-            }
+            "chacha20-ietf-poly1305" | "aead_chacha20_poly1305" => Some(Self::ChaCha20Poly1305),
             "plain" | "none" | "" => Some(Self::Plain),
             _ => None,
         }
@@ -180,9 +178,9 @@ impl ShadowUdpHandler {
 
 /// Encode target address in Shadowsocks format (SOCKS5-style).
 fn encode_ss_address(address: &str) -> Result<Vec<u8>, HandlerError> {
-    let (host, port_str) = address.rsplit_once(':').ok_or_else(|| {
-        HandlerError::Proxy(format!("invalid address: {}", address))
-    })?;
+    let (host, port_str) = address
+        .rsplit_once(':')
+        .ok_or_else(|| HandlerError::Proxy(format!("invalid address: {}", address)))?;
     let port: u16 = port_str
         .parse()
         .map_err(|_| HandlerError::Proxy(format!("invalid port: {}", port_str)))?;
@@ -310,8 +308,7 @@ mod tests {
         });
 
         // Start SS handler (plain cipher for testing)
-        let handler =
-            ShadowHandler::new("plain", "testpass", HandlerOptions::default());
+        let handler = ShadowHandler::new("plain", "testpass", HandlerOptions::default());
         let proxy = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let proxy_addr = proxy.local_addr().unwrap();
 
@@ -344,10 +341,7 @@ mod tests {
 
         let connector = ShadowConnector::new("plain", "testpass");
         let stream = TcpStream::connect(target_addr).await.unwrap();
-        let mut conn = connector
-            .connect(stream, "127.0.0.1:9999")
-            .await
-            .unwrap();
+        let mut conn = connector.connect(stream, "127.0.0.1:9999").await.unwrap();
 
         let mut buf = vec![0u8; 1024];
         let n = conn.read(&mut buf).await.unwrap();

@@ -28,10 +28,7 @@ impl Server {
     }
 
     /// Creates a server from an existing TcpListener.
-    pub fn from_listener(
-        listener: TcpListener,
-        handler: impl Handler + 'static,
-    ) -> Self {
+    pub fn from_listener(listener: TcpListener, handler: impl Handler + 'static) -> Self {
         Server {
             listener,
             handler: Arc::new(handler),

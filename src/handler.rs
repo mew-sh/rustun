@@ -117,8 +117,7 @@ mod tests {
     #[test]
     fn test_basic_proxy_auth() {
         use base64::Engine;
-        let encoded =
-            base64::engine::general_purpose::STANDARD.encode("user:pass");
+        let encoded = base64::engine::general_purpose::STANDARD.encode("user:pass");
         let auth = format!("Basic {}", encoded);
         let (u, p, ok) = basic_proxy_auth(&auth);
         assert!(ok);

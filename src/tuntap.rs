@@ -13,8 +13,8 @@ pub struct IpRoute {
 #[derive(Clone, Debug, Default)]
 pub struct TunConfig {
     pub name: String,
-    pub addr: String,    // network address, e.g., "10.0.0.1/24"
-    pub peer: String,    // peer address for point-to-point (macOS)
+    pub addr: String, // network address, e.g., "10.0.0.1/24"
+    pub peer: String, // peer address for point-to-point (macOS)
     pub mtu: u32,
     pub routes: Vec<IpRoute>,
     pub gateway: String, // default gateway
@@ -122,7 +122,11 @@ pub fn add_tun_routes(if_name: &str, routes: &[IpRoute]) -> Result<(), std::io::
 }
 
 /// Add routes for a TAP device.
-pub fn add_tap_routes(if_name: &str, gateway: &str, routes: &[String]) -> Result<(), std::io::Error> {
+pub fn add_tap_routes(
+    if_name: &str,
+    gateway: &str,
+    routes: &[String],
+) -> Result<(), std::io::Error> {
     platform_add_tap_routes(if_name, gateway, routes)
 }
 
@@ -132,7 +136,11 @@ pub fn add_tap_routes(if_name: &str, gateway: &str, routes: &[String]) -> Result
 fn platform_create_tun(cfg: &TunConfig) -> Result<String, std::io::Error> {
     use std::process::Command;
 
-    let name = if cfg.name.is_empty() { "tun0" } else { &cfg.name };
+    let name = if cfg.name.is_empty() {
+        "tun0"
+    } else {
+        &cfg.name
+    };
 
     // ip link set <name> up
     // ip address add <addr> dev <name>
@@ -141,7 +149,11 @@ fn platform_create_tun(cfg: &TunConfig) -> Result<String, std::io::Error> {
             .args(["address", "add", &cfg.addr, "dev", name])
             .status()?;
     }
-    let mtu = if cfg.mtu > 0 { cfg.mtu.to_string() } else { "1350".to_string() };
+    let mtu = if cfg.mtu > 0 {
+        cfg.mtu.to_string()
+    } else {
+        "1350".to_string()
+    };
     Command::new("ip")
         .args(["link", "set", name, "mtu", &mtu, "up"])
         .status()?;
@@ -155,14 +167,22 @@ fn platform_create_tun(cfg: &TunConfig) -> Result<String, std::io::Error> {
 fn platform_create_tap(cfg: &TapConfig) -> Result<String, std::io::Error> {
     use std::process::Command;
 
-    let name = if cfg.name.is_empty() { "tap0" } else { &cfg.name };
+    let name = if cfg.name.is_empty() {
+        "tap0"
+    } else {
+        &cfg.name
+    };
 
     if !cfg.addr.is_empty() {
         Command::new("ip")
             .args(["address", "add", &cfg.addr, "dev", name])
             .status()?;
     }
-    let mtu = if cfg.mtu > 0 { cfg.mtu.to_string() } else { "1500".to_string() };
+    let mtu = if cfg.mtu > 0 {
+        cfg.mtu.to_string()
+    } else {
+        "1500".to_string()
+    };
     Command::new("ip")
         .args(["link", "set", name, "mtu", &mtu, "up"])
         .status()?;
@@ -190,10 +210,16 @@ fn platform_add_tun_routes(if_name: &str, routes: &[IpRoute]) -> Result<(), std:
 }
 
 #[cfg(target_os = "linux")]
-fn platform_add_tap_routes(if_name: &str, gateway: &str, routes: &[String]) -> Result<(), std::io::Error> {
+fn platform_add_tap_routes(
+    if_name: &str,
+    gateway: &str,
+    routes: &[String],
+) -> Result<(), std::io::Error> {
     use std::process::Command;
     for route in routes {
-        if route.is_empty() { continue; }
+        if route.is_empty() {
+            continue;
+        }
         let mut args = vec!["route", "add", route, "dev", if_name];
         if !gateway.is_empty() {
             args.push("via");
@@ -210,8 +236,16 @@ fn platform_add_tap_routes(if_name: &str, gateway: &str, routes: &[String]) -> R
 fn platform_create_tun(cfg: &TunConfig) -> Result<String, std::io::Error> {
     use std::process::Command;
 
-    let name = if cfg.name.is_empty() { "utun0" } else { &cfg.name };
-    let mtu = if cfg.mtu > 0 { cfg.mtu.to_string() } else { "1350".to_string() };
+    let name = if cfg.name.is_empty() {
+        "utun0"
+    } else {
+        &cfg.name
+    };
+    let mtu = if cfg.mtu > 0 {
+        cfg.mtu.to_string()
+    } else {
+        "1350".to_string()
+    };
 
     if !cfg.addr.is_empty() {
         let mut args = vec!["ifconfig", name, "inet", &cfg.addr];
@@ -258,7 +292,11 @@ fn platform_add_tun_routes(if_name: &str, routes: &[IpRoute]) -> Result<(), std:
 }
 
 #[cfg(target_os = "macos")]
-fn platform_add_tap_routes(_if_name: &str, _gateway: &str, _routes: &[String]) -> Result<(), std::io::Error> {
+fn platform_add_tap_routes(
+    _if_name: &str,
+    _gateway: &str,
+    _routes: &[String],
+) -> Result<(), std::io::Error> {
     Err(std::io::Error::new(
         std::io::ErrorKind::Unsupported,
         "TAP is not supported on macOS",
@@ -271,18 +309,33 @@ fn platform_add_tap_routes(_if_name: &str, _gateway: &str, _routes: &[String]) -
 fn platform_create_tun(cfg: &TunConfig) -> Result<String, std::io::Error> {
     use std::process::Command;
 
-    let name = if cfg.name.is_empty() { "rustun-tun" } else { &cfg.name };
+    let name = if cfg.name.is_empty() {
+        "rustun-tun"
+    } else {
+        &cfg.name
+    };
 
     // Parse address and mask from CIDR notation
     if !cfg.addr.is_empty() {
         if let Ok(net) = cfg.addr.parse::<ipnet::IpNet>() {
             let ip = net.addr().to_string();
             let mask = net.netmask().to_string();
-            let gateway = if cfg.gateway.is_empty() { &ip } else { &cfg.gateway };
+            let gateway = if cfg.gateway.is_empty() {
+                &ip
+            } else {
+                &cfg.gateway
+            };
             Command::new("netsh")
                 .args([
-                    "interface", "ip", "set", "address",
-                    name, "static", &ip, &mask, gateway,
+                    "interface",
+                    "ip",
+                    "set",
+                    "address",
+                    name,
+                    "static",
+                    &ip,
+                    &mask,
+                    gateway,
                 ])
                 .status()?;
         }
@@ -297,17 +350,32 @@ fn platform_create_tun(cfg: &TunConfig) -> Result<String, std::io::Error> {
 fn platform_create_tap(cfg: &TapConfig) -> Result<String, std::io::Error> {
     use std::process::Command;
 
-    let name = if cfg.name.is_empty() { "rustun-tap" } else { &cfg.name };
+    let name = if cfg.name.is_empty() {
+        "rustun-tap"
+    } else {
+        &cfg.name
+    };
 
     if !cfg.addr.is_empty() {
         if let Ok(net) = cfg.addr.parse::<ipnet::IpNet>() {
             let ip = net.addr().to_string();
             let mask = net.netmask().to_string();
-            let gateway = if cfg.gateway.is_empty() { &ip } else { &cfg.gateway };
+            let gateway = if cfg.gateway.is_empty() {
+                &ip
+            } else {
+                &cfg.gateway
+            };
             Command::new("netsh")
                 .args([
-                    "interface", "ip", "set", "address",
-                    name, "static", &ip, &mask, gateway,
+                    "interface",
+                    "ip",
+                    "set",
+                    "address",
+                    name,
+                    "static",
+                    &ip,
+                    &mask,
+                    gateway,
                 ])
                 .status()?;
         }
@@ -324,9 +392,7 @@ fn platform_add_tun_routes(if_name: &str, routes: &[IpRoute]) -> Result<(), std:
     for route in routes {
         let dest = route.dest.to_string();
         // netsh interface ip add route <prefix> <interface> [nexthop]
-        let mut args = vec![
-            "interface", "ip", "add", "route", &dest, if_name,
-        ];
+        let mut args = vec!["interface", "ip", "add", "route", &dest, if_name];
         let gw_str;
         if let Some(gw) = &route.gateway {
             gw_str = gw.to_string();
@@ -338,10 +404,16 @@ fn platform_add_tun_routes(if_name: &str, routes: &[IpRoute]) -> Result<(), std:
 }
 
 #[cfg(target_os = "windows")]
-fn platform_add_tap_routes(if_name: &str, gateway: &str, routes: &[String]) -> Result<(), std::io::Error> {
+fn platform_add_tap_routes(
+    if_name: &str,
+    gateway: &str,
+    routes: &[String],
+) -> Result<(), std::io::Error> {
     use std::process::Command;
     for route in routes {
-        if route.is_empty() { continue; }
+        if route.is_empty() {
+            continue;
+        }
         let mut args = vec!["interface", "ip", "add", "route", route, if_name];
         if !gateway.is_empty() {
             args.push(gateway);
@@ -357,8 +429,16 @@ fn platform_add_tap_routes(if_name: &str, gateway: &str, routes: &[String]) -> R
 fn platform_create_tun(cfg: &TunConfig) -> Result<String, std::io::Error> {
     use std::process::Command;
 
-    let name = if cfg.name.is_empty() { "tun0" } else { &cfg.name };
-    let mtu = if cfg.mtu > 0 { cfg.mtu.to_string() } else { "1350".to_string() };
+    let name = if cfg.name.is_empty() {
+        "tun0"
+    } else {
+        &cfg.name
+    };
+    let mtu = if cfg.mtu > 0 {
+        cfg.mtu.to_string()
+    } else {
+        "1350".to_string()
+    };
 
     if !cfg.addr.is_empty() {
         Command::new("ifconfig")
@@ -375,8 +455,16 @@ fn platform_create_tun(cfg: &TunConfig) -> Result<String, std::io::Error> {
 fn platform_create_tap(cfg: &TapConfig) -> Result<String, std::io::Error> {
     use std::process::Command;
 
-    let name = if cfg.name.is_empty() { "tap0" } else { &cfg.name };
-    let mtu = if cfg.mtu > 0 { cfg.mtu.to_string() } else { "1500".to_string() };
+    let name = if cfg.name.is_empty() {
+        "tap0"
+    } else {
+        &cfg.name
+    };
+    let mtu = if cfg.mtu > 0 {
+        cfg.mtu.to_string()
+    } else {
+        "1500".to_string()
+    };
 
     let mut args = vec![name];
     if !cfg.addr.is_empty() {
@@ -410,10 +498,16 @@ fn platform_add_tun_routes(if_name: &str, routes: &[IpRoute]) -> Result<(), std:
 }
 
 #[cfg(all(unix, not(target_os = "linux"), not(target_os = "macos")))]
-fn platform_add_tap_routes(if_name: &str, gateway: &str, routes: &[String]) -> Result<(), std::io::Error> {
+fn platform_add_tap_routes(
+    if_name: &str,
+    gateway: &str,
+    routes: &[String],
+) -> Result<(), std::io::Error> {
     use std::process::Command;
     for route in routes {
-        if route.is_empty() { continue; }
+        if route.is_empty() {
+            continue;
+        }
         let mut args = vec!["-n", "add", "-net", route];
         if !gateway.is_empty() {
             args.push(gateway);
@@ -536,9 +630,9 @@ mod tests {
         // Minimal IPv4 header (20 bytes)
         let mut header = [0u8; 20];
         header[0] = 0x45; // version 4, IHL 5
-        header[9] = 6;    // TCP
+        header[9] = 6; // TCP
         header[12..16].copy_from_slice(&[192, 168, 1, 1]); // src
-        header[16..20].copy_from_slice(&[10, 0, 0, 1]);     // dst
+        header[16..20].copy_from_slice(&[10, 0, 0, 1]); // dst
 
         let (src, dst, proto) = parse_ipv4_header(&header).unwrap();
         assert_eq!(src, Ipv4Addr::new(192, 168, 1, 1));

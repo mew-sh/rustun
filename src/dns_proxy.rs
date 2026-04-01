@@ -52,13 +52,10 @@ impl Handler for DnsHandler {
         udp.send(&query).await?;
 
         let mut reply_buf = vec![0u8; 4096];
-        let n = tokio::time::timeout(
-            std::time::Duration::from_secs(5),
-            udp.recv(&mut reply_buf),
-        )
-        .await
-        .map_err(|_| HandlerError::Proxy("DNS upstream timeout".into()))?
-        .map_err(|e| HandlerError::Io(e))?;
+        let n = tokio::time::timeout(std::time::Duration::from_secs(5), udp.recv(&mut reply_buf))
+            .await
+            .map_err(|_| HandlerError::Proxy("DNS upstream timeout".into()))?
+            .map_err(|e| HandlerError::Io(e))?;
 
         // Send reply back over TCP
         let reply_len = (n as u16).to_be_bytes();
@@ -132,8 +129,7 @@ async fn forward_dns_query(
     udp.send(query).await?;
 
     let mut buf = vec![0u8; 4096];
-    let n = tokio::time::timeout(std::time::Duration::from_secs(5), udp.recv(&mut buf))
-        .await??;
+    let n = tokio::time::timeout(std::time::Duration::from_secs(5), udp.recv(&mut buf)).await??;
 
     Ok(buf[..n].to_vec())
 }

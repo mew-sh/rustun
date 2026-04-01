@@ -115,10 +115,8 @@ impl Bypass {
     }
 
     pub fn from_patterns(reversed: bool, patterns: &[&str]) -> Self {
-        let matchers: Vec<Box<dyn Matcher>> = patterns
-            .iter()
-            .filter_map(|p| new_matcher(p))
-            .collect();
+        let matchers: Vec<Box<dyn Matcher>> =
+            patterns.iter().filter_map(|p| new_matcher(p)).collect();
         Self::new(reversed, matchers)
     }
 
@@ -214,9 +212,7 @@ fn _split_line(line: &str) -> Vec<String> {
         line
     };
     let line = line.replace('\t', " ");
-    line.split_whitespace()
-        .map(|s| s.to_string())
-        .collect()
+    line.split_whitespace().map(|s| s.to_string()).collect()
 }
 
 #[cfg(test)]
@@ -225,7 +221,9 @@ mod tests {
 
     #[test]
     fn test_ip_matcher() {
-        let m = IpMatcher { ip: "192.168.1.1".parse().unwrap() };
+        let m = IpMatcher {
+            ip: "192.168.1.1".parse().unwrap(),
+        };
         assert!(m.match_value("192.168.1.1"));
         assert!(!m.match_value("192.168.1.2"));
         assert!(!m.match_value("invalid"));
@@ -233,7 +231,9 @@ mod tests {
 
     #[test]
     fn test_cidr_matcher() {
-        let m = CidrMatcher { net: "192.168.1.0/24".parse().unwrap() };
+        let m = CidrMatcher {
+            net: "192.168.1.0/24".parse().unwrap(),
+        };
         assert!(m.match_value("192.168.1.1"));
         assert!(m.match_value("192.168.1.254"));
         assert!(!m.match_value("192.168.2.1"));
@@ -264,9 +264,15 @@ mod tests {
 
     #[test]
     fn test_new_matcher() {
-        assert!(new_matcher("192.168.1.1").unwrap().match_value("192.168.1.1"));
-        assert!(new_matcher("192.168.1.0/24").unwrap().match_value("192.168.1.100"));
-        assert!(new_matcher("example.com").unwrap().match_value("example.com"));
+        assert!(new_matcher("192.168.1.1")
+            .unwrap()
+            .match_value("192.168.1.1"));
+        assert!(new_matcher("192.168.1.0/24")
+            .unwrap()
+            .match_value("192.168.1.100"));
+        assert!(new_matcher("example.com")
+            .unwrap()
+            .match_value("example.com"));
         assert!(new_matcher("").is_none());
     }
 

@@ -98,10 +98,7 @@ impl Handler for TcpRemoteForwardHandler {
 
         node.reset_dead();
 
-        let peer = conn
-            .local_addr()
-            .map(|a| a.to_string())
-            .unwrap_or_default();
+        let peer = conn.local_addr().map(|a| a.to_string()).unwrap_or_default();
 
         info!("[rtcp] {} <-> {}", peer, node.addr);
         transport(cc, conn).await.ok();
@@ -172,10 +169,8 @@ mod tests {
         });
 
         // Create remote forward handler
-        let handler = TcpRemoteForwardHandler::new(
-            &target_addr.to_string(),
-            HandlerOptions::default(),
-        );
+        let handler =
+            TcpRemoteForwardHandler::new(&target_addr.to_string(), HandlerOptions::default());
 
         // Start proxy that uses the handler
         let proxy = TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -213,10 +208,8 @@ mod tests {
         let listener_addr = listener_bind.local_addr().unwrap();
         drop(listener_bind); // release the port
 
-        let rfwd = TcpRemoteForwardListener::new(
-            &listener_addr.to_string(),
-            &target_addr.to_string(),
-        );
+        let rfwd =
+            TcpRemoteForwardListener::new(&listener_addr.to_string(), &target_addr.to_string());
 
         let handle = tokio::spawn(async move {
             rfwd.serve().await.ok();

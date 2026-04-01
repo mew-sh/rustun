@@ -155,29 +155,24 @@ mod tests {
         assert!(MuxFrame::decode(&[0, 0, 0, 1, 0x04, 0, 5]).is_none()); // payload too short
     }
 
-    #[test]
-    fn test_mux_session() {
-        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    #[tokio::test]
+    async fn test_mux_session() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
 
-        let client = std::net::TcpStream::connect(addr).unwrap();
-        let (_server_conn, _) = listener.accept().unwrap();
+        let client_tcp = TcpStream::connect(addr).await.unwrap();
+        let (_server_conn, _) = listener.accept().await.unwrap();
 
-        // Wrap in tokio TcpStream
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(async {
-            let client_tcp = TcpStream::from_std(client).unwrap();
-            let session = MuxSession::new(client_tcp);
+        let session = MuxSession::new(client_tcp);
 
-            assert!(!session.is_closed());
+        assert!(!session.is_closed());
 
-            let id1 = session.open_stream().unwrap();
-            let id2 = session.open_stream().unwrap();
-            assert_ne!(id1, id2);
+        let id1 = session.open_stream().unwrap();
+        let id2 = session.open_stream().unwrap();
+        assert_ne!(id1, id2);
 
-            session.close();
-            assert!(session.is_closed());
-            assert!(session.open_stream().is_none());
-        });
+        session.close();
+        assert!(session.is_closed());
+        assert!(session.open_stream().is_none());
     }
 }

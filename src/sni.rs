@@ -67,7 +67,10 @@ impl Handler for SniHandler {
                 self.options.whitelist.as_ref(),
                 self.options.blacklist.as_ref(),
             ) {
-                warn!("[sni] {} : unauthorized to connect to {}", peer_addr, target);
+                warn!(
+                    "[sni] {} : unauthorized to connect to {}",
+                    peer_addr, target
+                );
                 return Err(HandlerError::Forbidden);
             }
 
@@ -177,8 +180,7 @@ fn extract_sni(data: &[u8]) -> Option<String> {
             if pos + 2 > payload.len() {
                 return None;
             }
-            let _sni_list_len =
-                u16::from_be_bytes([payload[pos], payload[pos + 1]]) as usize;
+            let _sni_list_len = u16::from_be_bytes([payload[pos], payload[pos + 1]]) as usize;
             pos += 2;
 
             if pos >= payload.len() {
@@ -192,16 +194,13 @@ fn extract_sni(data: &[u8]) -> Option<String> {
                 if pos + 2 > payload.len() {
                     return None;
                 }
-                let name_len =
-                    u16::from_be_bytes([payload[pos], payload[pos + 1]]) as usize;
+                let name_len = u16::from_be_bytes([payload[pos], payload[pos + 1]]) as usize;
                 pos += 2;
 
                 if pos + name_len > payload.len() {
                     return None;
                 }
-                return Some(
-                    String::from_utf8_lossy(&payload[pos..pos + name_len]).to_string(),
-                );
+                return Some(String::from_utf8_lossy(&payload[pos..pos + name_len]).to_string());
             }
         }
 
@@ -230,7 +229,7 @@ mod tests {
         data.push(0x16); // handshake
         data.push(0x03);
         data.push(0x01); // TLS 1.0
-        // Record length placeholder - we'll fix at end
+                         // Record length placeholder - we'll fix at end
         let record_len_pos = data.len();
         data.push(0x00);
         data.push(0x00);
@@ -239,7 +238,7 @@ mod tests {
 
         // Handshake header
         data.push(0x01); // ClientHello
-        // Length placeholder
+                         // Length placeholder
         let hs_len_pos = data.len();
         data.push(0x00);
         data.push(0x00);

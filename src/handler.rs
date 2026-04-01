@@ -1,0 +1,297 @@
+use std::sync::Arc;
+use std::time::Duration;
+
+use async_trait::async_trait;
+use tokio::net::TcpStream;
+
+use crate::auth::Authenticator;
+use crate::bypass::Bypass;
+use crate::chain::Chain;
+use crate::node::Node;
+use crate::permissions::Permissions;
+
+/// Handler is a proxy server handler.
+#[async_trait]
+pub trait Handler: Send + Sync + 'static {
+    async fn handle(&self, conn: TcpStream) -> Result<(), HandlerError>;
+}
+
+/// HandlerOptions describes the options for Handler.
+#[derive(Clone, Default)]
+pub struct HandlerOptions {
+    pub addr: String,
+    pub chain: Option<Chain>,
+    pub users: Vec<(String, Option<String>)>,
+    pub authenticator: Option<Arc<dyn Authenticator>>,
+    pub whitelist: Option<Permissions>,
+    pub blacklist: Option<Permissions>,
+    pub bypass: Option<Arc<Bypass>>,
+    pub retries: usize,
+    pub timeout: Duration,
+    pub node: Option<Node>,
+    pub host: String,
+    pub proxy_agent: String,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum HandlerError {
+    #[error("IO error: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("proxy error: {0}")]
+    Proxy(String),
+    #[error("authentication failed")]
+    AuthFailed,
+    #[error("forbidden")]
+    Forbidden,
+    #[error("chain error: {0}")]
+    Chain(#[from] crate::chain::ChainError),
+}
+
+/// AutoHandler detects the protocol from the first byte.
+pub struct AutoHandler {
+    options: HandlerOptions,
+}
+
+impl AutoHandler {
+    pub fn new(options: HandlerOptions) -> Self {
+        Self { options }
+    }
+}
+
+#[async_trait]
+impl Handler for AutoHandler {
+    async fn handle(&self, mut conn: TcpStream) -> Result<(), HandlerError> {
+        let mut peek_buf = [0u8; 1];
+        let n = conn.peek(&mut peek_buf).await?;
+        if n == 0 {
+            return Err(HandlerError::Io(std::io::Error::new(
+                std::io::ErrorKind::UnexpectedEof,
+                "connection closed",
+            )));
+        }
+
+        match peek_buf[0] {
+            0x05 => {
+                // SOCKS5
+                let handler = crate::socks5::Socks5Handler::new(self.options.clone());
+                handler.handle(conn).await
+            }
+            0x04 => {
+                // SOCKS4/4a
+                let handler = crate::socks4::Socks4Handler::new(self.options.clone());
+                handler.handle(conn).await
+            }
+            _ => {
+                // Assume HTTP
+                let handler = crate::http_proxy::HttpHandler::new(self.options.clone());
+                handler.handle(conn).await
+            }
+        }
+    }
+}
+
+/// Helper: parse Basic Proxy-Authorization header.
+pub fn basic_proxy_auth(auth: &str) -> (String, String, bool) {
+    if auth.is_empty() || !auth.starts_with("Basic ") {
+        return (String::new(), String::new(), false);
+    }
+
+    let encoded = &auth[6..];
+    match base64::Engine::decode(&base64::engine::general_purpose::STANDARD, encoded) {
+        Ok(decoded) => {
+            let s = String::from_utf8_lossy(&decoded);
+            if let Some(idx) = s.find(':') {
+                (s[..idx].to_string(), s[idx + 1..].to_string(), true)
+            } else {
+                (String::new(), String::new(), false)
+            }
+        }
+        Err(_) => (String::new(), String::new(), false),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_basic_proxy_auth() {
+        use base64::Engine;
+        let encoded =
+            base64::engine::general_purpose::STANDARD.encode("user:pass");
+        let auth = format!("Basic {}", encoded);
+        let (u, p, ok) = basic_proxy_auth(&auth);
+        assert!(ok);
+        assert_eq!(u, "user");
+        assert_eq!(p, "pass");
+    }
+
+    #[test]
+    fn test_basic_proxy_auth_empty() {
+        let (u, p, ok) = basic_proxy_auth("");
+        assert!(!ok);
+        assert!(u.is_empty());
+        assert!(p.is_empty());
+    }
+
+    #[test]
+    fn test_basic_proxy_auth_invalid() {
+        let (_, _, ok) = basic_proxy_auth("Bearer token");
+        assert!(!ok);
+    }
+
+    #[test]
+    fn test_basic_proxy_auth_no_colon() {
+        use base64::Engine;
+        let encoded = base64::engine::general_purpose::STANDARD.encode("useronly");
+        let auth = format!("Basic {}", encoded);
+        let (_, _, ok) = basic_proxy_auth(&auth);
+        assert!(!ok);
+    }
+
+    #[test]
+    fn test_basic_proxy_auth_empty_password() {
+        use base64::Engine;
+        let encoded = base64::engine::general_purpose::STANDARD.encode("user:");
+        let auth = format!("Basic {}", encoded);
+        let (u, p, ok) = basic_proxy_auth(&auth);
+        assert!(ok);
+        assert_eq!(u, "user");
+        assert_eq!(p, "");
+    }
+
+    #[test]
+    fn test_basic_proxy_auth_colon_in_password() {
+        use base64::Engine;
+        let encoded = base64::engine::general_purpose::STANDARD.encode("user:pa:ss:word");
+        let auth = format!("Basic {}", encoded);
+        let (u, p, ok) = basic_proxy_auth(&auth);
+        assert!(ok);
+        assert_eq!(u, "user");
+        assert_eq!(p, "pa:ss:word");
+    }
+
+    #[test]
+    fn test_basic_proxy_auth_invalid_base64() {
+        let (_, _, ok) = basic_proxy_auth("Basic !!!invalid!!!");
+        assert!(!ok);
+    }
+
+    #[tokio::test]
+    async fn test_auto_handler_socks5_detection() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        use tokio::net::TcpListener;
+
+        let proxy = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let proxy_addr = proxy.local_addr().unwrap();
+
+        let handler = AutoHandler::new(HandlerOptions::default());
+
+        tokio::spawn(async move {
+            let (conn, _) = proxy.accept().await.unwrap();
+            handler.handle(conn).await.ok();
+        });
+
+        // Send SOCKS5 greeting (version byte 0x05)
+        let mut client = tokio::net::TcpStream::connect(proxy_addr).await.unwrap();
+        client.write_all(&[0x05, 0x01, 0x00]).await.unwrap();
+
+        // Should get SOCKS5 response
+        let mut resp = [0u8; 2];
+        client.read_exact(&mut resp).await.unwrap();
+        assert_eq!(resp[0], 0x05); // SOCKS5 version in response
+    }
+
+    #[tokio::test]
+    async fn test_auto_handler_socks4_detection() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        use tokio::net::TcpListener;
+
+        // Start a target to connect to
+        let target = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let target_addr = target.local_addr().unwrap();
+
+        tokio::spawn(async move {
+            let (mut conn, _) = target.accept().await.unwrap();
+            conn.write_all(b"auto-socks4").await.unwrap();
+        });
+
+        let proxy = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let proxy_addr = proxy.local_addr().unwrap();
+
+        let handler = AutoHandler::new(HandlerOptions::default());
+
+        tokio::spawn(async move {
+            let (conn, _) = proxy.accept().await.unwrap();
+            handler.handle(conn).await.ok();
+        });
+
+        // Send SOCKS4 CONNECT (version byte 0x04)
+        let mut client = tokio::net::TcpStream::connect(proxy_addr).await.unwrap();
+        let ip = match target_addr.ip() {
+            std::net::IpAddr::V4(ip4) => ip4,
+            _ => panic!("expected IPv4"),
+        };
+        let port = target_addr.port();
+        let mut req = vec![0x04, 0x01];
+        req.extend_from_slice(&port.to_be_bytes());
+        req.extend_from_slice(&ip.octets());
+        req.push(0x00);
+        client.write_all(&req).await.unwrap();
+
+        // Should get SOCKS4 reply (byte 0 = 0x00, byte 1 = 0x5A = granted)
+        let mut resp = [0u8; 8];
+        client.read_exact(&mut resp).await.unwrap();
+        assert_eq!(resp[1], 0x5A);
+    }
+
+    #[tokio::test]
+    async fn test_auto_handler_http_detection() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        use tokio::net::TcpListener;
+
+        let target = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let target_addr = target.local_addr().unwrap();
+
+        tokio::spawn(async move {
+            let (mut conn, _) = target.accept().await.unwrap();
+            conn.write_all(b"auto-http-target").await.unwrap();
+        });
+
+        let proxy = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let proxy_addr = proxy.local_addr().unwrap();
+
+        let handler = AutoHandler::new(HandlerOptions::default());
+
+        tokio::spawn(async move {
+            let (conn, _) = proxy.accept().await.unwrap();
+            handler.handle(conn).await.ok();
+        });
+
+        // Send HTTP CONNECT (starts with 'C' = 0x43, not 0x04 or 0x05)
+        let mut client = tokio::net::TcpStream::connect(proxy_addr).await.unwrap();
+        let req = format!(
+            "CONNECT {} HTTP/1.1\r\nHost: {}\r\n\r\n",
+            target_addr, target_addr
+        );
+        client.write_all(req.as_bytes()).await.unwrap();
+
+        let mut buf = vec![0u8; 4096];
+        let n = client.read(&mut buf).await.unwrap();
+        let response = String::from_utf8_lossy(&buf[..n]);
+        assert!(response.contains("200"));
+    }
+
+    #[test]
+    fn test_handler_options_default() {
+        let opts = HandlerOptions::default();
+        assert!(opts.chain.is_none());
+        assert!(opts.authenticator.is_none());
+        assert!(opts.whitelist.is_none());
+        assert!(opts.blacklist.is_none());
+        assert!(opts.bypass.is_none());
+        assert!(opts.node.is_none());
+        assert_eq!(opts.retries, 0);
+        assert!(opts.proxy_agent.is_empty());
+    }
+}

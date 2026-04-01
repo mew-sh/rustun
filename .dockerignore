@@ -1,0 +1,8 @@
+target/
+gost/
+.git/
+*.md
+LICENSE
+.dockerignore
+docker-compose.yml
+examples/*.sh

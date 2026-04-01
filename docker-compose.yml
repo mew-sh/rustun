@@ -1,0 +1,128 @@
+# ============================================================================
+# docker-compose.yml -- Example deployment topologies for rustun
+#
+# Usage:
+#   docker compose up -d                 # start all services
+#   docker compose up http-proxy         # start only the HTTP proxy
+#   docker compose logs -f               # follow logs
+#   docker compose down                  # stop everything
+# ============================================================================
+
+services:
+  # --------------------------------------------------------------------------
+  # 1. HTTP Proxy
+  #    Listens on port 8080. Clients configure HTTP proxy to host:8080.
+  # --------------------------------------------------------------------------
+  http-proxy:
+    build: .
+    command: ["-L", "http://:8080", "-D"]
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+  # --------------------------------------------------------------------------
+  # 2. SOCKS5 Proxy
+  #    Listens on port 1080. Supports username/password authentication.
+  # --------------------------------------------------------------------------
+  socks5-proxy:
+    build: .
+    command: ["-L", "socks5://admin:password@:1080", "-D"]
+    ports:
+      - "1080:1080"
+    restart: unless-stopped
+
+  # --------------------------------------------------------------------------
+  # 3. Auto-Detect Proxy
+  #    Listens on port 8888. Automatically detects HTTP, SOCKS4, or SOCKS5
+  #    based on the first byte of each incoming connection.
+  # --------------------------------------------------------------------------
+  auto-proxy:
+    build: .
+    command: ["-L", ":8888", "-D"]
+    ports:
+      - "8888:8888"
+    restart: unless-stopped
+
+  # --------------------------------------------------------------------------
+  # 4. Shadowsocks Server
+  #    Listens on port 8338 with AES-256-GCM encryption.
+  # --------------------------------------------------------------------------
+  shadowsocks:
+    build: .
+    command: ["-L", "ss://aes-256-gcm:supersecret@:8338", "-D"]
+    ports:
+      - "8338:8338"
+    restart: unless-stopped
+
+  # --------------------------------------------------------------------------
+  # 5. Relay Server
+  #    Listens on port 8443 with authentication.
+  # --------------------------------------------------------------------------
+  relay-server:
+    build: .
+    command: ["-L", "relay://relayuser:relaypass@:8443", "-D"]
+    ports:
+      - "8443:8443"
+    restart: unless-stopped
+
+  # --------------------------------------------------------------------------
+  # 6. TCP Port Forwarding
+  #    Forwards local port 2222 to an SSH server at target-ssh:22.
+  #    Demonstrates TCP direct forwarding with load balancing.
+  # --------------------------------------------------------------------------
+  tcp-forward:
+    build: .
+    command: ["-L", "tcp://:2222/target-ssh:22", "-D"]
+    ports:
+      - "2222:2222"
+    restart: unless-stopped
+
+  # --------------------------------------------------------------------------
+  # 7. DNS Proxy
+  #    Forwards DNS queries on port 5353 to Google Public DNS.
+  # --------------------------------------------------------------------------
+  dns-proxy:
+    build: .
+    command: ["-L", "dns://:5353/8.8.8.8:53", "-D"]
+    ports:
+      - "5353:5353"
+    restart: unless-stopped
+
+  # --------------------------------------------------------------------------
+  # 8. SNI Proxy
+  #    Routes TLS connections based on the SNI hostname in the ClientHello.
+  # --------------------------------------------------------------------------
+  sni-proxy:
+    build: .
+    command: ["-L", "sni://:4443", "-D"]
+    ports:
+      - "4443:4443"
+    restart: unless-stopped
+
+  # --------------------------------------------------------------------------
+  # 9. Chained Proxy
+  #    Local proxy on port 9080 that chains through the HTTP proxy.
+  #    Traffic path: client -> 9080 -> http-proxy:8080 -> target
+  # --------------------------------------------------------------------------
+  chained-proxy:
+    build: .
+    command: ["-L", ":9080", "-F", "http://http-proxy:8080", "-D"]
+    ports:
+      - "9080:9080"
+    depends_on:
+      - http-proxy
+    restart: unless-stopped
+
+  # --------------------------------------------------------------------------
+  # 10. Multi-Listener (from config file)
+  #     Uses a JSON config to start multiple services at once.
+  # --------------------------------------------------------------------------
+  multi-listener:
+    build: .
+    command: ["-C", "/etc/rustun/config.json", "-D"]
+    ports:
+      - "18080:8080"
+      - "11080:1080"
+    volumes:
+      - ./examples/config.json:/etc/rustun/config.json:ro
+    restart: unless-stopped

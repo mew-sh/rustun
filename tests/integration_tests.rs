@@ -158,11 +158,6 @@ async fn integration_socks5_auth_success_and_failure() {
     kvs.insert("alice".to_string(), "secret".to_string());
     let auth = Arc::new(rustun::LocalAuthenticator::new(kvs));
 
-    let handler = rustun::Socks5Handler::new(rustun::HandlerOptions {
-        authenticator: Some(auth.clone()),
-        ..Default::default()
-    });
-
     let proxy_listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let proxy_addr = proxy_listener.local_addr().unwrap();
 
@@ -653,10 +648,9 @@ async fn integration_server_handles_concurrent_connections() {
     // Send 10 concurrent connections
     let mut handles = Vec::new();
     for i in 0..10u32 {
-        let addr = addr;
         handles.push(tokio::spawn(async move {
             let mut client = TcpStream::connect(addr).await.unwrap();
-            let msg = format!("msg-{}", i);
+            let msg = format!("msg-{i}");
             client.write_all(msg.as_bytes()).await.unwrap();
             let mut buf = vec![0u8; 64];
             let n = client.read(&mut buf).await.unwrap();

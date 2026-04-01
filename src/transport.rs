@@ -16,8 +16,8 @@ where
 
     // Wait for either direction to finish
     tokio::select! {
-        r = t1 => { r.map_err(|e| io::Error::new(io::ErrorKind::Other, e))??; }
-        r = t2 => { r.map_err(|e| io::Error::new(io::ErrorKind::Other, e))??; }
+        r = t1 => { r.map_err(io::Error::other)??; }
+        r = t2 => { r.map_err(io::Error::other)??; }
     }
 
     Ok(())

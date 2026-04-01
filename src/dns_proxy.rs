@@ -55,7 +55,7 @@ impl Handler for DnsHandler {
         let n = tokio::time::timeout(std::time::Duration::from_secs(5), udp.recv(&mut reply_buf))
             .await
             .map_err(|_| HandlerError::Proxy("DNS upstream timeout".into()))?
-            .map_err(|e| HandlerError::Io(e))?;
+            .map_err(HandlerError::Io)?;
 
         // Send reply back over TCP
         let reply_len = (n as u16).to_be_bytes();

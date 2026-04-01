@@ -226,15 +226,15 @@ mod tests {
         // Verify we compile on the current platform
         #[cfg(target_os = "linux")]
         {
-            assert!(true, "Linux platform detected");
+            // Linux platform detected -- test passes by compilation
         }
         #[cfg(target_os = "windows")]
         {
-            assert!(true, "Windows platform detected");
+            // Windows platform detected -- test passes by compilation
         }
         #[cfg(target_os = "macos")]
         {
-            assert!(true, "macOS platform detected");
+            // macOS platform detected -- test passes by compilation
         }
     }
 }

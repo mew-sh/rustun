@@ -17,7 +17,6 @@ use tokio::net::TcpStream;
 /// 0x01 = SYN (new stream)
 /// 0x02 = FIN (close stream)
 /// 0x04 = DATA
-
 const FLAG_SYN: u8 = 0x01;
 const FLAG_FIN: u8 = 0x02;
 const FLAG_DATA: u8 = 0x04;

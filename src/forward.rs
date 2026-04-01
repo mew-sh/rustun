@@ -25,8 +25,7 @@ impl TcpDirectForwardHandler {
                 options
                     .node
                     .as_ref()
-                    .map(|n| n.values.get("ip").map(|s| s.as_str()))
-                    .flatten(),
+                    .and_then(|n| n.values.get("ip").map(|s| s.as_str())),
             )
             .filter(|a| !a.is_empty())
             .collect();

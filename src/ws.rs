@@ -146,7 +146,7 @@ impl Handler for WsHandler {
                                     Ok(0) => break,
                                     Ok(n) => {
                                         if ws_write
-                                            .send(Message::Binary(buf[..n].to_vec().into()))
+                                            .send(Message::Binary(buf[..n].to_vec()))
                                             .await
                                             .is_err()
                                         {

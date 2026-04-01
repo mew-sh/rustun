@@ -52,9 +52,8 @@ async fn main() {
 
     if cli.print_version {
         println!(
-            "rustun {} ({} {}/{})",
+            "rustun {} (rustc {}/{})",
             VERSION,
-            "rustc",
             std::env::consts::OS,
             std::env::consts::ARCH
         );

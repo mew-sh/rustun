@@ -269,7 +269,7 @@ impl Handler for Socks5Handler {
                 .await?;
                 // Keep connection alive until client disconnects
                 let mut buf = [0u8; 1];
-                conn.read(&mut buf).await.ok();
+                let _ = conn.read(&mut buf).await;
             }
             _ => {
                 send_reply(&mut conn, REP_CMD_NOT_SUPPORTED, "0.0.0.0", 0).await?;
@@ -561,7 +561,7 @@ mod tests {
         assert_eq!(resp, [0x05, 0x00]);
 
         // CONNECT with domain address type
-        let host = format!("127.0.0.1");
+        let host = "127.0.0.1".to_string();
         let port = target_addr.port();
         let mut req = vec![0x05, 0x01, 0x00, 0x03]; // ver, connect, rsv, domain
         req.push(host.len() as u8);

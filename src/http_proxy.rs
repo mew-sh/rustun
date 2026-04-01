@@ -113,7 +113,7 @@ impl Handler for HttpHandler {
             return Ok(());
         }
 
-        let parts: Vec<&str> = request_line.trim().split_whitespace().collect();
+        let parts: Vec<&str> = request_line.split_whitespace().collect();
         if parts.len() < 3 {
             return Err(HandlerError::Proxy("malformed request".into()));
         }

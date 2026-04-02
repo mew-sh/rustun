@@ -89,6 +89,13 @@ jobs:
         with:
           key: ${{ matrix.target }}
 
+      # Install OpenSSL dev headers for cross targets on the host
+      - name: Install cross-compilation dependencies
+        if: matrix.cross && runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev perl make
+
       # Cross-compilation tool for non-native targets
       - name: Install cross
         if: matrix.cross
@@ -99,10 +106,14 @@ jobs:
         if: ${{ !matrix.cross }}
         run: cargo build --release --target ${{ matrix.target }}
 
-      # Cross build
+      # Cross build with vendored OpenSSL (compiles OpenSSL from source
+      # so we do not need target-arch system headers)
       - name: Build (cross)
         if: matrix.cross
-        run: cross build --release --target ${{ matrix.target }}
+        env:
+          OPENSSL_STATIC: "1"
+          CROSS_CONFIG: Cross.toml
+        run: cross build --release --target ${{ matrix.target }} --features vendored-openssl
 
       # --- Package: tar.gz (Linux, macOS, FreeBSD) ---
       - name: Package (tar.gz)

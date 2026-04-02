@@ -5,18 +5,26 @@
 # ============================================================================
 FROM rust:1.82-bookworm AS builder
 
+# Install build dependencies for OpenSSL (needed by native-tls)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        pkg-config libssl-dev perl make && \
+    rm -rf /var/lib/apt/lists/*
+
 WORKDIR /usr/src/rustun
 
-# Cache dependency build: copy manifests first, create dummy main, build deps
+# Cache dependency build: copy manifests first, create dummy src, build deps
 COPY Cargo.toml Cargo.lock ./
-RUN mkdir src && \
-    echo 'fn main() { println!("placeholder"); }' > src/main.rs && \
+RUN mkdir -p src && \
+    echo 'fn main() {}' > src/main.rs && \
+    echo '' > src/lib.rs && \
     cargo build --release 2>/dev/null || true && \
     rm -rf src
 
 # Copy actual source and build
 COPY src/ src/
-RUN cargo build --release
+COPY tests/ tests/
+RUN touch src/main.rs src/lib.rs && cargo build --release
 
 # ============================================================================
 # Stage 2: Runtime

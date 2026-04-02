@@ -45,6 +45,11 @@ sha1 = "0.10"
 md5 = "0.7"
 bytes = "1"
 rcgen = "0.13"
+openssl = { version = "0.10", features = ["vendored"], optional = true }
+
+[features]
+default = []
+vendored-openssl = ["openssl"]
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

@@ -13,21 +13,24 @@ RUN apt-get update && \
 
 WORKDIR /usr/src/rustun
 
-# Cache dependency build: copy manifests first, create dummy src, build deps
+# Copy manifests and lock file
 COPY Cargo.toml Cargo.lock ./
-RUN mkdir -p src && \
+
+# Create dummy source files to pre-build dependencies.
+# This layer is cached until Cargo.toml or Cargo.lock changes.
+RUN mkdir -p src tests && \
     echo 'fn main() {}' > src/main.rs && \
     echo '' > src/lib.rs && \
-    cargo build --release 2>/dev/null || true && \
-    rm -rf src
+    cargo build --release && \
+    rm -rf src tests
 
-# Copy actual source and build
+# Copy real source and rebuild (only rustun crate recompiles)
 COPY src/ src/
 COPY tests/ tests/
 RUN touch src/main.rs src/lib.rs && cargo build --release
 
 # ============================================================================
-# Stage 2: Runtime
+# Stage 2: Runtime (minimal image)
 # ============================================================================
 FROM debian:bookworm-slim
 
@@ -40,7 +43,6 @@ RUN apt-get update && \
 
 COPY --from=builder /usr/src/rustun/target/release/rustun /usr/local/bin/rustun
 
-# Default configuration directory
 RUN mkdir -p /etc/rustun
 
 EXPOSE 8080 1080 8338 8443

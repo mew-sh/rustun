@@ -13,21 +13,13 @@ RUN apt-get update && \
 
 WORKDIR /usr/src/rustun
 
-# Copy manifests and lock file
+# Copy all source files and build in one step.
+# This is simpler and more reliable than a two-stage dependency cache,
+# which breaks when lib.rs exports are needed by main.rs.
 COPY Cargo.toml Cargo.lock ./
-
-# Create dummy source files to pre-build dependencies.
-# This layer is cached until Cargo.toml or Cargo.lock changes.
-RUN mkdir -p src tests && \
-    echo 'fn main() {}' > src/main.rs && \
-    echo '' > src/lib.rs && \
-    cargo build --release && \
-    rm -rf src tests
-
-# Copy real source and rebuild (only rustun crate recompiles)
 COPY src/ src/
 COPY tests/ tests/
-RUN touch src/main.rs src/lib.rs && cargo build --release
+RUN cargo build --release
 
 # ============================================================================
 # Stage 2: Runtime (minimal image)

@@ -1,28 +1,25 @@
 # ============================================================================
 # Multi-stage build for rustun
 # ============================================================================
-# Stage 1: Build
+# Stage 1: Build -- use latest stable Rust to avoid edition2024 issues
 # ============================================================================
-FROM rust:1.86-bookworm AS builder
+FROM rust:latest AS builder
 
-# Install build dependencies for OpenSSL (needed by native-tls)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        pkg-config libssl-dev perl make && \
+        pkg-config libssl-dev && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /usr/src/rustun
 
-# Copy all source files and build in one step.
-# This is simpler and more reliable than a two-stage dependency cache,
-# which breaks when lib.rs exports are needed by main.rs.
 COPY Cargo.toml Cargo.lock ./
 COPY src/ src/
 COPY tests/ tests/
+
 RUN cargo build --release
 
 # ============================================================================
-# Stage 2: Runtime (minimal image)
+# Stage 2: Runtime
 # ============================================================================
 FROM debian:bookworm-slim
 

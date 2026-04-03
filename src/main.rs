@@ -1,6 +1,8 @@
 use clap::Parser;
 use std::collections::HashMap;
 use std::sync::Arc;
+use tokio_util::sync::CancellationToken;
+use tokio_util::task::TaskTracker;
 use tracing::{error, info, warn};
 
 use rustun::*;
@@ -68,10 +70,15 @@ async fn main() {
         )
         .init();
 
+    // Global cancellation token: cancelled on Ctrl+C to shut down all servers
+    let cancel = CancellationToken::new();
+    // Track all spawned server tasks so we can wait for them on shutdown
+    let tracker = TaskTracker::new();
+
     if let Some(config_file) = &cli.config_file {
         match config::load_config(config_file) {
             Ok(cfg) => {
-                if let Err(e) = start_from_config(cfg).await {
+                if let Err(e) = start_from_config(cfg, &cancel, &tracker).await {
                     error!("Failed to start from config: {}", e);
                     std::process::exit(1);
                 }
@@ -82,7 +89,7 @@ async fn main() {
             }
         }
     } else if !cli.listen.is_empty() {
-        if let Err(e) = start_from_cli(&cli).await {
+        if let Err(e) = start_from_cli(&cli, &cancel, &tracker).await {
             error!("Failed to start: {}", e);
             std::process::exit(1);
         }
@@ -93,11 +100,22 @@ async fn main() {
         std::process::exit(0);
     }
 
+    // Wait for Ctrl+C, then trigger graceful shutdown
     tokio::signal::ctrl_c().await.ok();
     info!("Shutting down...");
+    cancel.cancel();
+
+    // Close tracker and wait for all server tasks to drain
+    tracker.close();
+    tracker.wait().await;
+    info!("All servers stopped.");
 }
 
-async fn start_from_cli(cli: &Cli) -> Result<(), Box<dyn std::error::Error>> {
+async fn start_from_cli(
+    cli: &Cli,
+    cancel: &CancellationToken,
+    tracker: &TaskTracker,
+) -> Result<(), Box<dyn std::error::Error>> {
     let chain = if cli.forward.is_empty() {
         Chain::empty()
     } else {
@@ -117,9 +135,10 @@ async fn start_from_cli(cli: &Cli) -> Result<(), Box<dyn std::error::Error>> {
     for listen_addr in &cli.listen {
         let node = Node::parse(listen_addr)?;
         let chain = chain.clone();
+        let cancel = cancel.clone();
 
-        tokio::spawn(async move {
-            if let Err(e) = run_server(node, chain).await {
+        tracker.spawn(async move {
+            if let Err(e) = run_server(node, chain, cancel).await {
                 error!("Server error: {}", e);
             }
         });
@@ -128,7 +147,11 @@ async fn start_from_cli(cli: &Cli) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-async fn start_from_config(cfg: config::Config) -> Result<(), Box<dyn std::error::Error>> {
+async fn start_from_config(
+    cfg: config::Config,
+    cancel: &CancellationToken,
+    tracker: &TaskTracker,
+) -> Result<(), Box<dyn std::error::Error>> {
     for route in cfg.routes {
         let chain = if route.chain_nodes.is_empty() {
             Chain::empty()
@@ -148,9 +171,10 @@ async fn start_from_config(cfg: config::Config) -> Result<(), Box<dyn std::error
         for ns in &route.serve_nodes {
             let node = Node::parse(ns)?;
             let chain = chain.clone();
+            let cancel = cancel.clone();
 
-            tokio::spawn(async move {
-                if let Err(e) = run_server(node, chain).await {
+            tracker.spawn(async move {
+                if let Err(e) = run_server(node, chain, cancel).await {
                     error!("Server error: {}", e);
                 }
             });
@@ -260,6 +284,7 @@ fn load_secrets_file(path: &str) -> Result<LocalAuthenticator, std::io::Error> {
 async fn run_server(
     node: Node,
     chain: Chain,
+    cancel: CancellationToken,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let handler_opts = build_handler_options(&node, chain);
 
@@ -279,120 +304,50 @@ async fn run_server(
         addr
     );
 
+    // Helper: create server, wire cancellation, serve
+    macro_rules! serve {
+        ($handler:expr) => {{
+            let server = Server::new(&addr, $handler).await?;
+            // Wire global cancel into the server's own cancel token
+            let server_cancel = server.cancel_token();
+            let cancel_clone = cancel.clone();
+            tokio::spawn(async move {
+                cancel_clone.cancelled().await;
+                server_cancel.cancel();
+            });
+            server.serve().await
+        }};
+    }
+
     match protocol.as_str() {
         // --- Proxy protocols ---
-        "http" => {
-            let handler = HttpHandler::new(handler_opts);
-            let server = Server::new(&addr, handler).await?;
-            server.serve().await
-        }
-        "socks5" | "socks" => {
-            let handler = Socks5Handler::new(handler_opts);
-            let server = Server::new(&addr, handler).await?;
-            server.serve().await
-        }
-        "socks4" | "socks4a" => {
-            let handler = Socks4Handler::new(handler_opts);
-            let server = Server::new(&addr, handler).await?;
-            server.serve().await
-        }
-        "ss" => {
+        "http" => serve!(HttpHandler::new(handler_opts)),
+        "socks5" | "socks" => serve!(Socks5Handler::new(handler_opts)),
+        "socks4" | "socks4a" => serve!(Socks4Handler::new(handler_opts)),
+        "ss" | "ssu" => {
             let method = node.get("method").unwrap_or("plain");
             let password = node
                 .user
                 .as_ref()
                 .and_then(|(_, p)| p.clone())
                 .unwrap_or_default();
-            let handler = ShadowHandler::new(method, &password, handler_opts);
-            let server = Server::new(&addr, handler).await?;
-            server.serve().await
+            serve!(ShadowHandler::new(method, &password, handler_opts))
         }
-        "ssu" => {
-            let method = node.get("method").unwrap_or("plain");
-            let password = node
-                .user
-                .as_ref()
-                .and_then(|(_, p)| p.clone())
-                .unwrap_or_default();
-            let handler = ShadowHandler::new(method, &password, handler_opts);
-            let server = Server::new(&addr, handler).await?;
-            server.serve().await
-        }
-        "http2" => {
-            let handler = Http2Handler::new(handler_opts);
-            let server = Server::new(&addr, handler).await?;
-            server.serve().await
-        }
-        "relay" => {
-            let handler = RelayHandler::new(&remote, handler_opts);
-            let server = Server::new(&addr, handler).await?;
-            server.serve().await
-        }
-        "sni" => {
-            let handler = SniHandler::new(handler_opts);
-            let server = Server::new(&addr, handler).await?;
-            server.serve().await
-        }
-
-        // --- Forwarding ---
-        "tcp" => {
-            let handler = TcpDirectForwardHandler::new(&remote, handler_opts);
-            let server = Server::new(&addr, handler).await?;
-            server.serve().await
-        }
-        "udp" => {
-            let handler = UdpDirectForwardHandler::new(&remote, handler_opts);
-            let server = Server::new(&addr, handler).await?;
-            server.serve().await
-        }
-        "rtcp" => {
-            let handler = TcpRemoteForwardHandler::new(&remote, handler_opts);
-            let server = Server::new(&addr, handler).await?;
-            server.serve().await
-        }
-        "rudp" => {
-            // Remote UDP forwarding -- handler accepts TCP, forwards to remote UDP
-            let handler = UdpDirectForwardHandler::new(&remote, handler_opts);
-            let server = Server::new(&addr, handler).await?;
-            server.serve().await
-        }
-
-        // --- DNS ---
-        "dns" | "dot" | "doh" => {
-            let handler = DnsHandler::new(&remote, handler_opts);
-            let server = Server::new(&addr, handler).await?;
-            server.serve().await
-        }
-
-        // --- Transparent proxy ---
-        "red" | "redirect" => {
-            let handler = TcpRedirectHandler::new(handler_opts);
-            let server = Server::new(&addr, handler).await?;
-            server.serve().await
-        }
-        "redu" | "redirectu" => {
-            let handler = redirect::UdpRedirectHandler::new(handler_opts);
-            let server = Server::new(&addr, handler).await?;
-            server.serve().await
-        }
-
-        // --- SSH ---
-        "forward" => {
-            let handler = SshForwardHandler::new(handler_opts, SshConfig::default());
-            let server = Server::new(&addr, handler).await?;
-            server.serve().await
-        }
-
-        // --- Default: auto-detect or TCP forward ---
+        "http2" => serve!(Http2Handler::new(handler_opts)),
+        "relay" => serve!(RelayHandler::new(&remote, handler_opts)),
+        "sni" => serve!(SniHandler::new(handler_opts)),
+        "tcp" => serve!(TcpDirectForwardHandler::new(&remote, handler_opts)),
+        "udp" | "rudp" => serve!(UdpDirectForwardHandler::new(&remote, handler_opts)),
+        "rtcp" => serve!(TcpRemoteForwardHandler::new(&remote, handler_opts)),
+        "dns" | "dot" | "doh" => serve!(DnsHandler::new(&remote, handler_opts)),
+        "red" | "redirect" => serve!(TcpRedirectHandler::new(handler_opts)),
+        "redu" | "redirectu" => serve!(redirect::UdpRedirectHandler::new(handler_opts)),
+        "forward" => serve!(SshForwardHandler::new(handler_opts, SshConfig::default())),
         _ => {
             if !remote.is_empty() {
-                let handler = TcpDirectForwardHandler::new(&remote, handler_opts);
-                let server = Server::new(&addr, handler).await?;
-                server.serve().await
+                serve!(TcpDirectForwardHandler::new(&remote, handler_opts))
             } else {
-                let handler = handler::AutoHandler::new(handler_opts);
-                let server = Server::new(&addr, handler).await?;
-                server.serve().await
+                serve!(handler::AutoHandler::new(handler_opts))
             }
         }
     }

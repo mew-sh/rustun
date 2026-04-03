@@ -128,7 +128,7 @@ impl Handler for WsHandler {
                         let (mut tcp_read, mut tcp_write) = tokio::io::split(cc);
 
                         // WebSocket -> TCP
-                        let ws_to_tcp = tokio::spawn(async move {
+                        let mut ws_to_tcp = tokio::spawn(async move {
                             while let Some(Ok(msg)) = ws_read.next().await {
                                 if let Message::Binary(data) = msg {
                                     if tcp_write.write_all(&data).await.is_err() {
@@ -139,7 +139,7 @@ impl Handler for WsHandler {
                         });
 
                         // TCP -> WebSocket
-                        let tcp_to_ws = tokio::spawn(async move {
+                        let mut tcp_to_ws = tokio::spawn(async move {
                             let mut buf = vec![0u8; 32768];
                             loop {
                                 match tcp_read.read(&mut buf).await {
@@ -158,9 +158,11 @@ impl Handler for WsHandler {
                             }
                         });
 
+                        // Wait for either direction to finish, abort the other
+                        // to prevent leaked tasks
                         tokio::select! {
-                            _ = ws_to_tcp => {}
-                            _ = tcp_to_ws => {}
+                            _ = &mut ws_to_tcp => { tcp_to_ws.abort(); }
+                            _ = &mut tcp_to_ws => { ws_to_tcp.abort(); }
                         }
 
                         info!("[ws] {} >-< {}", peer_addr, target);

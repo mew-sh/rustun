@@ -2,14 +2,22 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use tokio::net::TcpListener;
+use tokio_util::sync::CancellationToken;
+use tokio_util::task::TaskTracker;
 use tracing::{error, info};
 
 use crate::handler::Handler;
 
-/// Server is a proxy server.
+/// Server is a proxy server with graceful shutdown support.
+///
+/// Uses a `CancellationToken` so that all spawned connection handlers
+/// are notified on shutdown, and a `TaskTracker` so the server can
+/// wait for in-flight connections to drain before exiting.
 pub struct Server {
     listener: TcpListener,
     handler: Arc<dyn Handler>,
+    cancel: CancellationToken,
+    tracker: TaskTracker,
 }
 
 impl Server {
@@ -24,6 +32,8 @@ impl Server {
         Ok(Server {
             listener,
             handler: Arc::new(handler),
+            cancel: CancellationToken::new(),
+            tracker: TaskTracker::new(),
         })
     }
 
@@ -32,6 +42,8 @@ impl Server {
         Server {
             listener,
             handler: Arc::new(handler),
+            cancel: CancellationToken::new(),
+            tracker: TaskTracker::new(),
         }
     }
 
@@ -40,36 +52,82 @@ impl Server {
         self.listener.local_addr()
     }
 
+    /// Returns a CancellationToken that can be used to trigger graceful shutdown.
+    pub fn cancel_token(&self) -> CancellationToken {
+        self.cancel.clone()
+    }
+
     /// Serve accepts connections and handles them.
+    ///
+    /// When the cancellation token is cancelled, the server stops accepting
+    /// new connections and waits for all in-flight handlers to complete.
     pub async fn serve(self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let mut temp_delay = Duration::ZERO;
 
         loop {
-            match self.listener.accept().await {
-                Ok((stream, peer_addr)) => {
-                    temp_delay = Duration::ZERO;
-                    let handler = self.handler.clone();
-
-                    tokio::spawn(async move {
-                        if let Err(e) = handler.handle(stream).await {
-                            tracing::debug!("[server] {} : {}", peer_addr, e);
-                        }
-                    });
+            tokio::select! {
+                // Check for cancellation before accepting
+                _ = self.cancel.cancelled() => {
+                    info!("[server] shutdown signal received, draining connections...");
+                    break;
                 }
-                Err(e) => {
-                    if temp_delay.is_zero() {
-                        temp_delay = Duration::from_millis(5);
-                    } else {
-                        temp_delay *= 2;
+                result = self.listener.accept() => {
+                    match result {
+                        Ok((stream, peer_addr)) => {
+                            temp_delay = Duration::ZERO;
+                            let handler = self.handler.clone();
+                            let cancel = self.cancel.clone();
+
+                            // Spawn through TaskTracker so we can wait for completion
+                            self.tracker.spawn(async move {
+                                tokio::select! {
+                                    result = handler.handle(stream) => {
+                                        if let Err(e) = result {
+                                            tracing::debug!("[server] {} : {}", peer_addr, e);
+                                        }
+                                    }
+                                    _ = cancel.cancelled() => {
+                                        tracing::debug!("[server] {} : cancelled", peer_addr);
+                                    }
+                                }
+                            });
+                        }
+                        Err(e) => {
+                            if temp_delay.is_zero() {
+                                temp_delay = Duration::from_millis(5);
+                            } else {
+                                temp_delay *= 2;
+                            }
+                            if temp_delay > Duration::from_secs(1) {
+                                temp_delay = Duration::from_secs(1);
+                            }
+                            error!("Accept error: {}; retrying in {:?}", e, temp_delay);
+                            tokio::time::sleep(temp_delay).await;
+                        }
                     }
-                    if temp_delay > Duration::from_secs(1) {
-                        temp_delay = Duration::from_secs(1);
-                    }
-                    error!("Accept error: {}; retrying in {:?}", e, temp_delay);
-                    tokio::time::sleep(temp_delay).await;
                 }
             }
         }
+
+        // Close the tracker so wait() can complete
+        self.tracker.close();
+
+        // Wait for all in-flight connections to finish (with a timeout)
+        let drain_timeout = Duration::from_secs(10);
+        if tokio::time::timeout(drain_timeout, self.tracker.wait())
+            .await
+            .is_err()
+        {
+            tracing::warn!(
+                "[server] drain timeout after {:?}, {} tasks still running",
+                drain_timeout,
+                self.tracker.len()
+            );
+        } else {
+            info!("[server] all connections drained");
+        }
+
+        Ok(())
     }
 }
 
@@ -101,11 +159,12 @@ mod tests {
         let addr = listener.local_addr().unwrap();
 
         let server = Server::from_listener(listener, EchoHandler);
+        let cancel = server.cancel_token();
+
         let server_handle = tokio::spawn(async move {
             server.serve().await.ok();
         });
 
-        // Connect and send data
         let mut client = TcpStream::connect(addr).await.unwrap();
         client.write_all(b"hello rustun").await.unwrap();
 
@@ -113,6 +172,26 @@ mod tests {
         let n = client.read(&mut buf).await.unwrap();
         assert_eq!(&buf[..n], b"hello rustun");
 
-        server_handle.abort();
+        // Graceful shutdown instead of abort
+        cancel.cancel();
+        let result = tokio::time::timeout(Duration::from_secs(2), server_handle).await;
+        assert!(result.is_ok(), "server should shut down within 2 seconds");
+    }
+
+    #[tokio::test]
+    async fn test_server_graceful_shutdown() {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let server = Server::from_listener(listener, EchoHandler);
+        let cancel = server.cancel_token();
+
+        let handle = tokio::spawn(async move {
+            server.serve().await.ok();
+        });
+
+        // Cancel immediately
+        cancel.cancel();
+
+        let result = tokio::time::timeout(Duration::from_secs(2), handle).await;
+        assert!(result.is_ok(), "server should exit promptly on cancel");
     }
 }
